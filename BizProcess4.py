@@ -20,7 +20,6 @@ import calendar
 issue_file = 'expense_issue.txt'
 finance_guy = 'jane.wang'
 approval_line = 'TH(approve) - MS(approve) - Pu Tian(approve) - Honglae Cho(consent) - Jane Wang(noti)'
-
 main_dict = {}	# 用于存储用户数据的主字典, {'填写日期浮点数':{'title':'', 'start_year':'',...}}
 
 def input_module():
@@ -49,9 +48,10 @@ def input_module():
 		approval = []
 		actions = {
 		'file_prep' : '',
-		'barcode_scan' : '',
-		'expense_request' : '',
-		'approvals' : '',
+		'expense_save' : '',
+		'expense_submit' : '',
+		'approval_submit' : '',
+		'approval_done' : '',
 		'print_paste' : '',
 		'sf_label' : '',
 		'send_mail': ''
@@ -91,11 +91,11 @@ def general_process(trace):
 	approval = trace['approval']
 	# cross_month_approval:
 	month = trace['month']
-	day = trace['day']
+	# day = trace['day']
 	current_year = int(time.strftime('%Y',time.localtime()))
 	current_month = int(time.strftime('%m',time.localtime()))
 	current_day = int(time.strftime('%d',time.localtime()))
-	current_hour = int(time.strftime('%H',time.localtime()))
+	# current_hour = int(time.strftime('%H',time.localtime()))
 	month_cap = calendar.monthrange(current_year, current_month)
 	threshold = 3	# 月末可能由于材料邮寄不及时导致的报销退回的危险时间段
 	
@@ -129,121 +129,105 @@ def file_prep(trace):
 	'pub' : ['出租车小票', '火车票']
 	}
 	credit_card_paid = trace['credit_card_paid']
-	welcome = '请将如下材料粘贴在A4纸上并扫描到EDM备用:\n{0}'format(file_name)
+	# welcome = '请将如下材料粘贴在A4纸上并扫描到EDM备用:\n{0}'format(file_name)
 	type = trace['type']
 	selected_file = basic_file[type]
 	
-	elif 'sep' in type:
+	if 'sep' in type:
 		if credit_card_paid is not 'y':
 			barcode = '张贴barcode并扫描到现金报销系统'
 			selected_file.append(barcode)
+
+	print('请将如下材料粘贴在A4纸上并扫描到EDM备用:\n{0}'.format('\n'.join*(selected_file)))
 	
-	return selected_file
+	return
 
 def approval_prep(trace):
 	
+	approvals_cn = []
 	approvals = trace['approval']
+	if not approvals:
+		return
+	if 'cross_month_approval' in approvals:
+		approvals_cn.append('跨月禀议')
+	if 'taxi_out_of_range_approval' in approvals:
+		approvals_cn.append('出租车超程禀议')
+	if 'ticket_change_approval' in approvals:
+		approvals_cn.append('改签禀议')
+	if 'cash_expense_approval' in approvals:
+		approvals_cn.append('现金报销禀议')
+	if 'attendance_approval' in approvals:
+		approvals_cn.append('考勤申请')
+	print('请编写如下禀议/申请并等待审批，审批路径为：{0}\n{1}'.format(approval_line, approvals_cn))
 	
-# def wait_prep(trace):
-# def expense_prep(trace):
-# def mail_prep(trace):
-# def multi_task_cordinate():
-# def 
-	'''根据当前进度罗列下一步动作'''
+	return
 
-		
-# def biz_action(trace):
-	# ''''''
-	# biz_file = '出租车小票\n登机牌/火车票\n酒店专票\n酒店流水单\n酒店刷卡单'
-	# expense_path = 'GERP - Business Travel - Expense Request'
-	# action_indicator = trace['actions']	
-	# approval = trace['approval']
-	# next_one = ''
-	# next_two = ''
-	# standard_biz_action_list = [
-	# '0将如下材料粘贴在A4纸上,标注时间,地点及金额, 并扫描至EDM备用.'.format(biz_file),
-	# '1请编写跨月禀议,审批路径为{0}, 提交'.format(approval_line),
-	# '2请编写出租车超规禀议, 审批路径为{0}, 提交.'.format(approval_line),
-	# '3请编写机票/车票改签禀议, 审批路径为{0}, 提交.'.formant(approval_line),
-	# '4编写报销申请, 路径为{0}, 并*保存*.'.format(expense_path),
-	# '5等待所有禀议审批完成\n{0}'.format('\n'.join(approval)),
-	# '6提交报销申请并等待完成.'
-	# '7将所有材料(打印禀议)左上角粘贴',
-	# '8打印顺丰标签.',
-	# '9联系快递邮寄文件.'
-	# ]
+def expense_save(trace):
 	
-	# # 根据报销进度, 判断接下来两步需要做什么
-	# if not action_indicator['file_prep']:
-		# next_one = standard_biz_action_list[0]
-		# next_two = ''
-		# if not approval:
-			# next_two = standard_biz_action_list[4]
-		# else:
-			# next_two = '\n'.join(approval)
-	# elif not action_indicator['approvals']:
-		# if not approval:
-			# next_one = standard_biz_action_list[4]
-			# next_two = standard_biz_action_list[6]
-		# else:
-			# next_one = 
-# -----------------------------------------------
-	# if not action_indicator['file_prep']:
-		# hint_str = ''
-		# biz_file = '出租车小票\n登机牌/火车票\n酒店专票\n酒店流水单\n酒店刷卡单'
-		# pub_file = '出租车小票\n火车票\n'
-		# sep_file = '原始单据\n发票\n刷卡单(转账记录)\nBarCode'
-		# if 'biz' in trace['type']:
-			# hint_str = biz_file
-		# elif 'pub' in trace['type']:
-			# hint_str = pub_file
-		# elif 'sep' in trace['type']:
-			# hint_str = sep_file
-		# next_one = '请将如下材料粘贴在A4纸上并扫描到EDM备用\n{0}'.format(biz_file)
-		# if not trace['approval']:
-			# next_two = '请编写 {0} 报销申请并录入相关凭据'.formant(trace['title'])
-		# else:
-			# next_two = '请编写 {0} 如下禀议, 以原始凭据扫描件作为附件, 并提交:\n{1}'.formant(trace['title'], trace['approval'])
+	expense_path = {
+	'biz' : 'G-ERP => Business Travel => Expense Request',
+	'cash' : 'G-ERP => MyFinance => Cash',
+	'card' : 'G-ERP => MyFinance => Credit Card'
+	}
+	expense_type = trace['type']
+	if 'biz' in expense_type:
+		general_message = '请在如下路径编写出差报销申请，并录入相关票据\n{0}'.format(expense_path['biz'])
+	elif 'pub' in expense_type:
+		general_message = '请在如下路径下编写公出报销申请，并录入相关票据\n{0}'.format(expense_path['cash'])
+	else:
+		if 'y' in trace['credit_card_paid']:
+			general_message = '请在如下路径下编写特殊事项报销申请，并录入相关票据\n{0}'.format(expense_path['card'])
+		else:
+			general_message = '请在如下路径下编写特殊事项报销申请，并录入相关票据\n{0}'.format(expense_path['cash'])
 
-		
-'''	# 根据当前日期, 提醒不同的事项
-# ------ Danger Zone ------#
+	return general_message
 
-=(COUNTIF(D2:D901, ">"&0.9*G3)-COUNTIF(D2:D901, ">"&1.1*G3))/900
+def expense_submit(trace):
+	general_message = '提交已保存的报销申请，并打印封面，等待至少一位老板审批'
+	return general_message
 
+def mail_prep():
+	general_message = '请将所有报销材料粘贴左上角，SF LABEL 打印顺丰快递单，singleID初始账号密码\n联系快递小哥准备邮寄'
+	return general_message
 
+def wait_for_cash():
+	general_process = '等待报销审批完批'
+	return general_process
 
+def multi_task_cordinate():
+	'''将除最新的trace以外的trace标记为等待状态'''	
+	if len(main_dict) <= 1:
+		return
+	key_list = []
+	for trace_number, trace in main_dict.keys():
+		if trace['done']:
+			continue
+		key_list.append(int(trace_number))
+	key_list.sort()
+	staff_number = key_list[:]
+	active_trace_number = str(key_list.pop(0))
+	active_trace = main_dict[active_trace_number]
+	active_trace.update({'wait' : ''})
+	main_dict.update({active_trace_number : active_trace})
+	for idle_trace_number in key_list:
+		idle_trace = main_dict[idle_trace_number]
+		idle_trace.update({'wait' : 'y'})
+		main_dict.update({idle_trace_number : idle_trace})
 
+	return staff_number
 
+def middle_gule():
+	# 忽略已完成的trace
+	# 处理最新的trace
+	# 根据trace的indicator来生成接下来的行动
+	staff_num = multi_task_cordinate()
+	if not staff_num:
+		start_input = input('暂无需要处理的报销，需要新建报销事项吗？<y/n>\n> ')
+		if start_input is 'y':
+			input_module()
+		else:
+			exit()
+	else:
+		pass
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
+	return
