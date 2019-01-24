@@ -2,17 +2,14 @@
 # 开机启动,用于提醒应处理的报销事务
 # 应答式助手
 
-version = '0.0.1'
+version = '0.1.0'
 author = 'xinyu.kou@samsung.com'
 
 '''
-display_module() 用于显示当前事务, 包括项目以及to do
-check_uncheck_module() 标记/取消标记完成项
-re_calculat() 标记完成后重新排列事项
 input_module() 从用户处收集信息,存入主字典
 	根据用户输入时间生成索引键, 键值为属性字典{titile:'xxx', 'start_year':2019, 'start_month':'1'等等}
 '''
-
+import os
 import time
 import json
 import calendar
@@ -20,15 +17,14 @@ import calendar
 issue_file = 'expense_issue.txt'
 finance_guy = 'jane.wang'
 approval_line = 'TH(approve) - MS(approve) - Pu Tian(approve) - Honglae Cho(consent) - Jane Wang(noti)'
+global main_dict
 main_dict = {}	# 用于存储用户数据的主字典, {'填写日期浮点数':{'title':'', 'start_year':'',...}}
 
 def input_module():
 	'''交互界面, 将用户报销信息保存到主字典
 		输入main_dict{} 输出main_dict{}
 	'''
-	
 	continue_input = 'y'
-	
 	while continue_input == 'y':
 		staff_key = str(time.time())
 		trace = {}
@@ -52,9 +48,7 @@ def input_module():
 		'expense_submit' : '',
 		'approval_submit' : '',
 		'approval_done' : '',
-		'print_paste' : '',
-		'sf_label' : '',
-		'send_mail': ''
+		'print_paste' : ''
 		}
 		# ------------------
 		if 'biz' in type:
@@ -87,8 +81,8 @@ def input_module():
 
 def general_process(trace):
 	'''处理禀议'''
-
 	approval = trace['approval']
+	indicator = trace['actions']
 	# cross_month_approval:
 	month = trace['month']
 	# day = trace['day']
@@ -96,10 +90,9 @@ def general_process(trace):
 	current_month = int(time.strftime('%m',time.localtime()))
 	current_day = int(time.strftime('%d',time.localtime()))
 	# current_hour = int(time.strftime('%H',time.localtime()))
-	month_cap = calendar.monthrange(current_year, current_month)
+	month_cap = (calendar.monthrange(current_year, current_month))[0]
 	threshold = 3	# 月末可能由于材料邮寄不及时导致的报销退回的危险时间段
-	
-	if month == current_month and current_day <= (month_cap - threshold):
+	if month == current_month and current_day <= month_cap - threshold:
 		pass
 	else:
 		approval.append('cross_month_approval')
@@ -111,18 +104,20 @@ def general_process(trace):
 		approval.append('ticket_change_approval')
 	# cash_expsens_approval:
 	if trace['credit_card_paid'] is not 'y':
-		approval.append('cash_expense_approval')
+		if not 'biz' in trace['type']:
+			approval.append('cash_expense_approval')
 	# attendance_approval:
 	if trace['type'] is 'pub':
 		approval.append('attendance_approval')
-	trace.update({'approval' : approval})
+
+	if not approval:
+		indicator.update({'approval_submit' : 'y', 'approval_done' : 'y'})
+	trace.update({'approval' : approval, 'actions' : indicator})
 	
 	return trace
 
 
 def file_prep(trace):
-	
-	
 	basic_file = {
 	'biz' : ['出租车小票', '登机牌/火车票', '酒店专票', '酒店流水单', '酒店刷卡单'],
 	'sep' : ['刷卡单', '发票'],
@@ -132,18 +127,16 @@ def file_prep(trace):
 	# welcome = '请将如下材料粘贴在A4纸上并扫描到EDM备用:\n{0}'format(file_name)
 	type = trace['type']
 	selected_file = basic_file[type]
-	
+
 	if 'sep' in type:
 		if credit_card_paid is not 'y':
 			barcode = '张贴barcode并扫描到现金报销系统'
 			selected_file.append(barcode)
-
-	print('请将如下材料粘贴在A4纸上并扫描到EDM备用:\n{0}'.format('\n'.join*(selected_file)))
+	print('请将如下材料粘贴在A4纸上并扫描到EDM备用:\n{0}'.format('\n'.join(selected_file)))
 	
 	return
 
 def approval_prep(trace):
-	
 	approvals_cn = []
 	approvals = trace['approval']
 	if not approvals:
@@ -158,12 +151,14 @@ def approval_prep(trace):
 		approvals_cn.append('现金报销禀议')
 	if 'attendance_approval' in approvals:
 		approvals_cn.append('考勤申请')
-	print('请编写如下禀议/申请并等待审批，审批路径为：{0}\n{1}'.format(approval_line, approvals_cn))
-	
+	print('请编写如下禀议/申请, 审批路径为：{0}\n{1}'.format(approval_line, approvals_cn))
+
 	return
+def wait_for_approval():
+	general_message = '请等待所有禀议完批后打印禀议'
+	return general_message
 
 def expense_save(trace):
-	
 	expense_path = {
 	'biz' : 'G-ERP => Business Travel => Expense Request',
 	'cash' : 'G-ERP => MyFinance => Cash',
@@ -182,7 +177,7 @@ def expense_save(trace):
 
 	return general_message
 
-def expense_submit(trace):
+def expense_submit():
 	general_message = '提交已保存的报销申请，并打印封面，等待至少一位老板审批'
 	return general_message
 
@@ -196,15 +191,17 @@ def wait_for_cash():
 
 def multi_task_cordinate():
 	'''将除最新的trace以外的trace标记为等待状态'''	
-	if len(main_dict) <= 1:
+	if not main_dict:
 		return
 	key_list = []
-	for trace_number, trace in main_dict.keys():
+	for trace_number, trace in main_dict.items():
 		if trace['done']:
 			continue
-		key_list.append(int(trace_number))
+		key_list.append(float(trace_number))
+	if not key_list:
+		return key_list
 	key_list.sort()
-	staff_number = key_list[:]
+	staff_number = [str(x) for x in key_list]
 	active_trace_number = str(key_list.pop(0))
 	active_trace = main_dict[active_trace_number]
 	active_trace.update({'wait' : ''})
@@ -216,18 +213,73 @@ def multi_task_cordinate():
 
 	return staff_number
 
-def middle_gule():
+def interface():
 	# 忽略已完成的trace
 	# 处理最新的trace
 	# 根据trace的indicator来生成接下来的行动
-	staff_num = multi_task_cordinate()
-	if not staff_num:
-		start_input = input('暂无需要处理的报销，需要新建报销事项吗？<y/n>\n> ')
-		if start_input is 'y':
-			input_module()
-		else:
-			exit()
-	else:
-		pass
-
+	global main_dict
+	if os.path.isfile('db.json'):
+		with open('db.json', 'r') as db:
+			main_dict = json.load(db)
+	continue_display = 'y'
+	while continue_display:
+		staff_num = multi_task_cordinate()
+		if not staff_num:
+			start_input = input('暂无需要处理的报销，需要新建报销事项吗？<y/n>\n> ')
+			if start_input is 'y':
+				input_module()
+				staff_num = multi_task_cordinate()
+			else:
+				exit()			
+		normal_process(staff_num)
+		with open('db.json', 'w') as db:
+			json.dump(main_dict, db)
 	return
+
+def normal_process(staff_num):
+	for slice_num in staff_num:
+		trace = main_dict[slice_num]
+		print('=' * 20)
+		print(trace['title'])
+		print('-' * 10)
+		indicator = trace['actions']
+
+		if not indicator['approval_submit']:
+			approval_prep(trace)
+			complete_checker('approval_submit', indicator)
+		elif not indicator['file_prep']:
+			file_prep(trace)
+			complete_checker('file_prep', indicator)
+		elif not indicator['expense_save']:
+			print(expense_save(trace))
+			complete_checker('expense_save', indicator)
+		elif not indicator['approval_done']:
+			print(wait_for_approval())
+			complete_checker('approval_done', indicator)
+		elif not indicator['expense_submit']:
+			if trace['wait']:
+				print('请等待上一笔报销结束后，方可进行接下来的报销')
+			print(expense_submit())
+			complete_checker('expense_submit', indicator)
+		elif not indicator['print_paste']:
+			print(mail_prep())
+			complete_checker('print_paste', indicator)
+		else:
+			expense_complete = input('已完批，坐等收钱？<y/n>\n> ')
+			if expense_complete == 'y':
+				trace.update({'done' : 'y'})
+		trace.update(indicator)
+		main_dict.update({slice_num : trace})
+	return
+
+def complete_checker(key, indicator):
+	print('=' * 10)
+	print('\n' * 10)
+	complete_check = input('上述事项完成了吗？<y/n>\n> ')
+	if complete_check == 'y':
+		indicator.update({key : 'y'})
+	elif complete_check == 'n':
+		exit()
+	return
+
+interface()
