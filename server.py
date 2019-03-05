@@ -2,16 +2,29 @@ import socket
 import threading
 import time
 import json
+import os
 
 
-# ------ 创建socket服务器 ------#
-#s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#s.bind(('', 1025))
-#s.listen(5)
-#s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#sock, addr = s.accept()
-#t1 = threading.Thread(target=dataRecv, args=(sock, addr))
-#t1.start()
+main_dict_file = 'main_dict.json'
+
+class Log():
+    '''log类'''
+    def __init__(self, log_name):
+        if type(log_name) != str:
+            raise TypeError('Wrong log_name type, it should be str.')
+        self.log_name = log_name + '.log'
+
+    def write(self, strings):
+        if type(strings) != str:
+            raise TypeError('Wrong log string type, it should be str.')
+        with open(self.log_name, 'a') as file:
+            c_readable_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            file.write(c_readable_time + '  ' + str)
+
+    def trash(self):
+        with open(self.log_name, 'w') as file:
+            trash_warning = 'log deleted by host.'
+            file.write(trash_warning)
 
 class Inbox():
     '''模拟一个支持多线程的socket服务端'''
@@ -50,7 +63,6 @@ class Inbox():
             return
         t1 = threading.Thread(target=serverDaemon, args=(self,), daemon=True)
         t1.start()    
-  
 
     def led(self):
         '''判断led灯当前状态'''
@@ -64,15 +76,31 @@ class Inbox():
         else:
             return self.__record.pop(0)
 
-# ----------------Unit Test--------------- #
-test_server = Inbox(1025)
-test_server.on()
+
+def load_main_dict(main_dict_file):
+    '''尝试从本地json文件恢复main_dict,以防止主控以外关闭导致的数据丢失'''
+
+    if os.path.exists(main_dict_file):
+        with open(main_dict_file, 'r') as main_dict_obj:
+            main_dict = json.loads(main_dict_obj)
+    else:
+        main_dict = {}
+    return main_dict
+
+def process(info):
+    pass
+
+
+
+# ------ Danger Zone ------ #
+monitor_inbox = Inbox(1025)
+main_log = Log('main.log')
+warning_log = Log('warning.log')
+error_log = Log('error.log')
+
+monitor_inbox.on()
+main_dict = load_main_dict(main_dict_file)
 
 while True:
-    if test_server.led():
-        print(test_server.vomit())
-    else:
-        time.sleep(1)
-        print(time.time())
-
-# ------------ Unit Test ------------ #
+    if monitor_inbox.led():
+        pass
