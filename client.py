@@ -22,8 +22,9 @@ class Client():
         self.__s.close()
 
 class SSD():
-    def __init__(self, disk_num):
-        self.disk_num = disk_num
+    def __init__(self, char_device):
+        self.__char_device = char_device
+        self.disk_num = re.split('/', self.__char_device)[-1]
         self.__detail = {}
 
     def __list_to_dict(self, list_info, sep=':'):
@@ -58,8 +59,7 @@ class SSD():
         return pci_speed
 
     def __get_smart(self):
-        device_full_name = '/dev/' + self.disk_num
-        get_smart_cmd = 'nvme smart-log {0}'.format(device_full_name)
+        get_smart_cmd = 'nvme smart-log {0}'.format(self.__char_device)
         smart_info = os.popen(get_smart_cmd).readlines()
         info_dict = self.__list_to_dict(smart_info)
         return info_dict
@@ -67,18 +67,27 @@ class SSD():
     def __get_boot_info(self):
         get_boot_drive_cmd = "df -h | grep -E '/boot$'"
         boot_drive_info = os.popen(get_boot_drive_cmd).readlines()[0]
-        if self.disk_num in boot_drive_info:
+        key_char = self.__char_device + 'n1'    # 精确匹配，避免nvme1匹配到nvme11.
+        if key_char in boot_drive_info:
             boot = 'Master'
         else:
             boot = 'Slave'
         return boot
+
+    def __get_sn_info(self):
+        get_sn_cmd = "nvme id-ctrl {0} | grep -E '^vid|sn|\<mn\>|\<fr\>'".format(self.__char_device)
+        sn_info = os.popen(get_sn_cmd).readlines()
+        info_dict = self.__list_to_dict(sn_info)
+        return info_dict
 
     def load(self):
         self.__detail['disk_num'] = self.disk_num
         self.__detail['boot'] = self.__get_boot_info()
         self.__detail['pci_speed'] = self.__get_pci_speed()
         smart_dict = self.__get_smart()
+        sn_info_dict = self.__get_sn_info()
         self.__detail.update(smart_dict)
+        self.__detail.update(sn_info_dict)
         return
 
     def dump(self):
@@ -108,7 +117,38 @@ class DictCompare():
                 self.decrease.append(key)
         return self.increase, self.decrease, self.diff  
 
-# === Danger Zone ===
+class Commander():
+    '''命令交互框架，内部处理系统打印的返回信息。'''
+    def __init__(self):
+        pass
+    def input(self):
+        '''输入系统命令'''
+        pass
+    def output(self):
+        '''输出系统输出'''
+        pass
+
+def get_char_info():
+    '''获取dera nvme ssd字符设备信息'''
+    get_nvme_node_command = "ls /dev/nvme* | grep nvme.$"
+    node_info_raw = os.popen(get_nvme_node_command).readlines()
+    char_info = [
+        x.replace('\n', '').replace(' ', '').replace('\t', '')
+        for x in node_info_raw if node_info_raw
+    ]
+    return char_info
+# ========== Western Wall ========== #
+char_info = get_char_info()
+ssd_instanse_list = []
+for char_device in char_info:
+    ssd_instanse = SSD(char_device)
+    ssd_instanse_list.append(ssd_instanse)
+
+for ssd_instanse in ssd_instanse_list:
+    ssd_instanse.load()
+    print(ssd_instanse.dump())
+
+
 
 # test_client = Client('109.101.80.172', 1025)
 # nvme_sample = SSD('nvme0')
