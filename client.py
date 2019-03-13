@@ -1,4 +1,5 @@
 import socket
+import struct
 import json
 import time
 import re
@@ -14,7 +15,10 @@ class Client():
         self.__s.connect((self.__ip, self.__port_number))
 
     def send(self, data):
-        encode_data = (json.dumps(data)).encode('utf-8')
+        body = json.dumps(data)
+        header = [body.__len__()]
+        headerPack = struct.pack("!I", *header)
+        encode_data = headerPack + body.encode('utf-8')
         self.__s.send(encode_data)
         self.__s.send(('').encode('utf-8')) # 发送约定的空字符作为结束标志
 
@@ -59,7 +63,7 @@ class SSD():
         return pci_speed
 
     def __get_smart(self):
-        get_smart_cmd = 'nvme smart-log {0}'.format(self.__char_device)
+        get_smart_cmd = 'nvme smart-log {0}|grep -E "criti|temp|power|unsafe|media|num"'.format(self.__char_device)
         smart_info = os.popen(get_smart_cmd).readlines()
         info_dict = self.__list_to_dict(smart_info)
         return info_dict
@@ -69,9 +73,9 @@ class SSD():
         boot_drive_info = os.popen(get_boot_drive_cmd).readlines()[0]
         key_char = self.__char_device + 'n1'    # 精确匹配，避免nvme1匹配到nvme11.
         if key_char in boot_drive_info:
-            boot = 'Master'
+            boot = "Master"
         else:
-            boot = 'Slave'
+            boot = "Slave"
         return boot
 
     def __get_sn_info(self):
@@ -81,9 +85,10 @@ class SSD():
         return info_dict
 
     def load(self):
-        self.__detail['disk_num'] = self.disk_num
-        self.__detail['boot'] = self.__get_boot_info()
-        self.__detail['pci_speed'] = self.__get_pci_speed()
+        self.__detail["disk_num"] = self.disk_num
+        self.__detail["boot"] = self.__get_boot_info()
+        self.__detail["pci_num"] = self.__get_pci_bus_num()
+        self.__detail["pci_speed"] = self.__get_pci_speed()
         smart_dict = self.__get_smart()
         sn_info_dict = self.__get_sn_info()
         self.__detail.update(smart_dict)
@@ -137,20 +142,74 @@ def get_char_info():
         for x in node_info_raw if node_info_raw
     ]
     return char_info
+
+def compare():
+    pass
+
+def get_current_ssd_info():
+    ssd_info = {}
+    char_info = get_char_info()
+    for char_device in char_info:   # 获取当前ssd信息列表
+        ssd_instanse = SSD(char_device)
+        ssd_instanse.load()
+        single_detail = ssd_instanse.dump()
+        pci_number = single_detail.pop('pci_num')
+        ssd_info.update({pci_number : single_detail})
+    return ssd_info
+
+def get_last_info(file_name):
+    if os.path.exists(file_name):
+        with open(file_name, 'r') as last_trace:
+            last_info = json.load(last_trace)
+    else:
+        last_info = {}
+    return last_info
+
+def get_host_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+ 
+    return ip
+
+def pack(identifier, info_type, info_level):
+    
+    info_tobe_send = {"id":identifier, "type":info_type, "level":info_level}
+    if info_level is 2:
+        pass
+    else:
+        info_tobe_send.update({"ssd_info" : current_ssd_info})
+        with open('dump.json', 'w') as dump_file:
+            json.dump(info_tobe_send, dump_file)
+    return info_tobe_send
+
 # ========== Western Wall ========== #
-char_info = get_char_info()
-ssd_instanse_list = []
-for char_device in char_info:
-    ssd_instanse = SSD(char_device)
-    ssd_instanse_list.append(ssd_instanse)
 
-for ssd_instanse in ssd_instanse_list:
-    ssd_instanse.load()
-    print(ssd_instanse.dump())
+differ = DictCompare()
+info_type = "monitor"
+deliver = Client('109.101.80.172', 1025)
 
+while True:
+    last_info = get_last_info('dump.json')
+    current_ssd_info = get_current_ssd_info()
+    # current_script_info = get_current_script_info()
+    # current_machine_info = get_current_machine_info()
 
+    if last_info:
+        identifier = last_info['id']
+        last_ssd_info = last_info['ssd_info']
+        # last_script_info = last_info['script_info']
+        # last_machine_info = last_info['machine_info']
+        if last_info != current_ssd_info:
+            info_level = 1
+        else:
+            info_level = 2
+    else:
+        identifier = str(time.time())+ get_host_ip()
+        info_level = 0
 
-# test_client = Client('109.101.80.172', 1025)
-# nvme_sample = SSD('nvme0')
-# nvme_sample.load()
-# print(nvme_sample.dump())
+    info_tobe_send = pack(identifier, info_type, info_level)
+    deliver.send(info_tobe_send)
