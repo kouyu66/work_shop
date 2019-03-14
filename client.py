@@ -157,6 +157,13 @@ def get_current_ssd_info():
         ssd_info.update({pci_number : single_detail})
     return ssd_info
 
+def get_current_server_info():
+    pass
+    return {}
+
+def get_current_script_info():
+    pass
+    return {}
 def get_last_info(file_name):
     if os.path.exists(file_name):
         with open(file_name, 'r') as last_trace:
@@ -182,6 +189,8 @@ def pack(identifier, info_type, info_level):
         pass
     else:
         info_tobe_send.update({"ssd_info" : current_ssd_info})
+        info_tobe_send.update({"script_info" : current_script_info})
+        info_tobe_send.update({"server_info" : current_server_info})
         with open('dump.json', 'w') as dump_file:
             json.dump(info_tobe_send, dump_file)
     return info_tobe_send
@@ -195,14 +204,16 @@ deliver = Client('109.101.80.172', 1025)
 while True:
     last_info = get_last_info('dump.json')
     current_ssd_info = get_current_ssd_info()
-    # current_script_info = get_current_script_info()
-    # current_machine_info = get_current_machine_info()
+    current_script_info = get_current_script_info()
+    current_server_info = get_current_server_info()
 
     if last_info:
         identifier = last_info['id']
         last_ssd_info = last_info['ssd_info']
-        # last_script_info = last_info['script_info']
-        # last_machine_info = last_info['machine_info']
+        last_script_info = last_info['script_info']
+        last_machine_info = last_info['machine_info']
+
+        # 需要判断发送什么数据出去，该功能将在下个版本修复。暂时对主程序不构成影响。
         if last_info != current_ssd_info:
             info_level = 1
         else:

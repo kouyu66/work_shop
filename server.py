@@ -142,7 +142,7 @@ def powercycle_processor(message):
 
 def monitor_processor(message):
     '''主字典刷新及log记录操作'''
-    identifier = message.pop("id") # id should be timestamp + ip string,
+    identifier = message.get("id") # id should be timestamp + ip string,
     info_level = message.pop("level") # 0 init 1 update 2 heart_beat
     if info_level is 0:
         sub_init_process(identifier, message)
@@ -159,15 +159,15 @@ def monitor_processor(message):
     elif info_level is 2:
         info = '[{0}] ^^^ Alive Detected ^^^'.format(identifier)
         main_log.write(info)
-    main_dict.update({identifier : {"server_info":server_info,"script_info":script_info,"ssd_info":ssd_info}})
+    main_dict.update(message)
     return
 
 def sub_init_process(identifier, message):
-    server_info = message.get("server_info")
+    # server_info = message.get("server_info")
     ssd_info = message.get("ssd_info")
     info = '====== New Clietn Join ======\n'
-    for key, value in server_info.items():
-        info = info + '{0} : {1}\n'.format(key, value)
+
+
     for key, value in ssd_info.items():
         info = info + '{0} : {1}\n'.format(key, value)
     main_log.write(info)
