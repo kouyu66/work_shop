@@ -199,7 +199,6 @@ def pack(identifier, info_type, info_level):
 
 differ = DictCompare()
 info_type = "monitor"
-deliver = Client('109.101.80.172', 1025)
 
 while True:
     last_info = get_last_info('dump.json')
@@ -211,7 +210,7 @@ while True:
         identifier = last_info['id']
         last_ssd_info = last_info['ssd_info']
         last_script_info = last_info['script_info']
-        last_machine_info = last_info['machine_info']
+        last_machine_info = last_info['server_info']
 
         # 需要判断发送什么数据出去，该功能将在下个版本修复。暂时对主程序不构成影响。
         if last_info != current_ssd_info:
@@ -222,5 +221,6 @@ while True:
         identifier = str(time.time())+ get_host_ip()
         info_level = 0
 
+    deliver = Client('109.101.80.172', 1025)
     info_tobe_send = pack(identifier, info_type, info_level)
     deliver.send(info_tobe_send)

@@ -101,17 +101,23 @@ class DictCompare():
     def compare(self, new_item, old_item):
         if not type(old_item) == type(new_item):
             raise ValueError('type error. different type cannot be compared.')
-        for key in new_item:
-            if key not in old_item:
-                self.increase.append(key)
-            else:
-                if new_item[key] == old_item[key]:
-                    continue
+        if new_item and old_item:
+            for key in new_item:
+                if key not in old_item:
+                    self.increase.append(key)
                 else:
-                    self.diff.append(key)
-        for key in old_item:
-            if key not in new_item:
-                self.decrease.append(key)
+                    if new_item[key] == old_item[key]:
+                        continue
+                    else:
+                        self.diff.append(key)
+            for key in old_item:
+                if key not in new_item:
+                    self.decrease.append(key)
+        elif new_item:
+            self.increase = list(old_item.keys())
+        elif old_item:
+            self.decrease = list(new_item.keys())
+
         return self.increase, self.decrease, self.diff    
 
 
@@ -142,7 +148,7 @@ def powercycle_processor(message):
 
 def monitor_processor(message):
     '''主字典刷新及log记录操作'''
-    identifier = message.get("id") # id should be timestamp + ip string,
+    identifier = message.pop("id") # id should be timestamp + ip string,
     info_level = message.pop("level") # 0 init 1 update 2 heart_beat
     if info_level is 0:
         sub_init_process(identifier, message)
@@ -159,7 +165,7 @@ def monitor_processor(message):
     elif info_level is 2:
         info = '[{0}] ^^^ Alive Detected ^^^'.format(identifier)
         main_log.write(info)
-    main_dict.update(message)
+    main_dict.update({identifier : message})
     return
 
 def sub_init_process(identifier, message):
@@ -197,42 +203,35 @@ def sub_single_dict_process(single_dict_name, single_dict_info, identifier):
 
     return
 
-def sub_ssd_process(new_ssd_info, identifier):
-    old_ssd_info = main_dict[identifier]["ssd_info"]
-    increase_ssd_bus, decrease_ssd_bus, diff_ssd_bus = dict_comp.compare(new_ssd_info, old_ssd_info)
-
-    if increase_ssd_bus:
-        for bus_num in increase_ssd_bus:
-            info = '[{0}] +++ SSD Insert Detected +++\n'.format(identifier)
-            for key, value in new_ssd_info[bus_num].items():
-                info = info + '[{0} : {1}]'.format(key, value)
-            info = info + '+++                     +++\n'
+def sub_ssd_process(new_ssd_sum, identifier):
+    old_ssd_sum = main_dict[identifier]["ssd_info"]
+    insert_ssd, eject_ssd, diff_ssd = dict_comp.compare(new_ssd_sum, old_ssd_sum)
+    if insert_ssd:
+        for bus_num in insert_ssd:
+            info = '{0} +++ SSD Insert Detected +++\n'.format(identifier)
+            ssd_detail = new_ssd_sum[bus_num]
+            for key, value in ssd_detail.items():
+                info += '[{0} : {1}]\n'.format(key, value)
+            print(info)
             main_log.write(info)
-            warning_log.write(info)
-    if decrease_ssd_bus:
-        for bus_num in decrease_ssd_bus:
-            info = '[{0}] --- SSD Eject Detected ---\n'.format(identifier)
-            for key, value in old_ssd_info[bus_num]:
-                info = info + '[{0} : {1}]'.format(key, value)
-            info = info + '---                    ---'
-    if diff_ssd_bus:
-        info = '[{0}] --- ssd info change notice ---\n'.format(identifier)
-        for bus_num in diff_ssd_bus:
-            new_ssd_detail = new_ssd_info.get(bus_num)
-            old_ssd_detail = old_ssd_info.get(bus_num)
-            increase_key,decrease_key,diff_key = dict_comp.compare(new_ssd_detail,old_ssd_detail)
-            if increase_key or decrease_key:
-                print('ssd info invalid. abort.')
-                continue
-            for key in diff_key:
-                old_value = old_ssd_detail.get(key)
-                new_value = new_ssd_detail.get(key)
-                pn_num = new_ssd_detail.get('pn')
-                info = info + "[{0} + '-' +{1}] {2} : {3} ===> {4}\n".format(bus_num,pn_num,key,old_value,new_value)
-        info = info + '------------------------------\n'
-        main_log.write(info)
-        warning_log.write(info)
-
+    if eject_ssd:
+        for bus_num in eject_ssd:
+            info = '{0} --- SSD Eject Detected ---\n'.format(identifier)
+            ssd_detail = old_ssd_sum[bus_num]
+            for key, value in ssd_detail.items():
+                info += '[{0} : {1}]\n'.format(key, value)
+            print(info)
+            main_log.write(info)
+    if diff_ssd:
+        for bus_num in diff_ssd:
+            info = '{0} ??? SSD Info Change Notice ???\n'.format(identifier)
+            new_ssd_detail = new_ssd_sum[bus_num]
+            old_ssd_detail = old_ssd_sum[bus_num]
+            for item in new_ssd_detail:
+                if new_ssd_detail[item] != old_ssd_detail[item]:
+                    info += '[{0} : {1} ===> {2}]\n'.format(item, old_ssd_detail[item], new_ssd_detail[item])
+            print(info)
+            main_log.write(info)    
 # ------ Danger Zone ------ #
 main_dict_file = 'main_dict.json'
 monitor_inbox = Inbox(1025) # 建立监控服务器
@@ -248,8 +247,7 @@ while True:
     if monitor_inbox.led():
         message = monitor_inbox.vomit()
         process(message)
+        with open(main_dict_file, 'w') as db:
+            json.dump(main_dict, db)
     else:
-        time.sleep(1)
-
-    with open(main_dict_file, 'w') as db:
-        json.dump(main_dict, db)
+        time.sleep(2)
