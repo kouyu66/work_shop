@@ -238,8 +238,8 @@ def sub_ssd_process(new_ssd_sum, identifier):
             body = '[{0}][{1}][{2}]-{3}-'.format(pci_num,sn_num,disk_num,boot)
             for item in new_ssd_detail:
                 if new_ssd_detail[item] != old_ssd_detail[item]:
-                    if item is 'temperature':
-                        if int(new_ssd_detail[item]) < 65: 
+                    if item == 'temperature':
+                        if int(new_ssd_detail[item]) < 60: 
                             continue
                     info = '  [{0} : {1} ===> {2}]\n'.format(item, old_ssd_detail[item], new_ssd_detail[item])
                     notice = body + info
@@ -250,6 +250,10 @@ def sub_ssd_process(new_ssd_sum, identifier):
             for notice in bodybox:
                 print(notice)
                 main_log.write(notice)
+        else:
+            info = '[{0}] ^^^ Alive Detected ^^^'.format(identifier)
+            print(info)
+            main_log.write(info)
 
 
 # ------ Danger Zone ------ #
