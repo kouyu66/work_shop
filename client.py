@@ -224,4 +224,4 @@ while True:
     deliver = Client('109.101.80.172', 1025)
     info_tobe_send = pack(identifier, info_type, info_level)
     deliver.send(info_tobe_send)
-    time.sleep(15)
+    time.sleep(60)
