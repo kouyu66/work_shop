@@ -239,7 +239,7 @@ def sub_ssd_process(new_ssd_sum, identifier):
             for item in new_ssd_detail:
                 if new_ssd_detail[item] != old_ssd_detail[item]:
                     if item == 'temperature':
-                        if int(new_ssd_detail[item]) < 60: 
+                        if int(new_ssd_detail[item][:-1]) < 60: 
                             continue
                     info = '  [{0} : {1} ===> {2}]\n'.format(item, old_ssd_detail[item], new_ssd_detail[item])
                     notice = body + info
@@ -251,7 +251,7 @@ def sub_ssd_process(new_ssd_sum, identifier):
                 print(notice)
                 main_log.write(notice)
         else:
-            info = '[{0}] ^^^ Alive Detected ^^^'.format(identifier)
+            info = '[{0}] ^^^ Alive Detected ^^^\n'.format(identifier)
             print(info)
             main_log.write(info)
 
