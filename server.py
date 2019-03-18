@@ -43,24 +43,24 @@ class Inbox():
             '''无限循环接受远程联入信息，转交dataRecv函数处理，并为每一次联入单开一个线程，支持多线程'''
             def dataRecv(self, sock, addr, lock):
                 '''获取锁以后，每1024个字节收一次数据包，解析并添加到类属性列表中，同时设置led状态为True，通讯完毕后端口关闭，释放锁'''
-                lock.acquire()
-                dataBuffer = bytes()
-                headerSize = 4
+                lock.acquire()  # 获取进程锁
+                dataBuffer = bytes()    # 初始化网络数据缓存区
+                headerSize = 4  # 规定头信息所占用的字节数
                 while True:    
                     data = sock.recv(1024)
                     if data:
                         dataBuffer += data
-                        if len(dataBuffer) < headerSize:
+                        if len(dataBuffer) < headerSize:    # 模拟header信息接收不全的状态，
                             continue
-                        headpack = struct.unpack('!I',dataBuffer[:headerSize])
+                        headpack = struct.unpack('!I',dataBuffer[:headerSize])  # header仅包含数据包大小的描述信息
                         bodySize = headpack[0]
-                        if len(dataBuffer) < headerSize + bodySize:
+                        if len(dataBuffer) < headerSize + bodySize: # 模拟单次发送信息不全的情况
                             continue
                         body = dataBuffer[headerSize:headerSize+bodySize]
                         decode_data = json.loads(body.decode('utf-8'))
                         self.__record.append(decode_data)
                         self.__led = True
-                        dataBuffer = bytes()
+                        dataBuffer = bytes()    # 考虑到客户端脚本规定，发送完全部信息后关闭端口，dataBuffer无需处理粘包的情况
                         break
                     else:
                         break
@@ -82,7 +82,6 @@ class Inbox():
 
     def vomit(self):
         '''返回属性类堆栈中的第一条信息'''
-        
         if not self.__record:
             return None
         else:
@@ -99,6 +98,10 @@ class DictCompare():
         self.diff = []
         
     def compare(self, new_item, old_item):
+        self.increase = []  # bug fix: log打印重复信息
+        self.decrease = []  # bug fix: log打印重复信息
+        self.diff = []      # bug fix: log打印重复信息
+
         if not type(old_item) == type(new_item):
             raise ValueError('type error. different type cannot be compared.')
         if new_item and old_item:
@@ -216,22 +219,39 @@ def sub_ssd_process(new_ssd_sum, identifier):
             main_log.write(info)
     if eject_ssd:
         for bus_num in eject_ssd:
-            info = '{0} --- SSD Eject Detected ---\n'.format(identifier)
+            info = '{0} xxx SSD Eject Detected xxx\n'.format(identifier)
             ssd_detail = old_ssd_sum[bus_num]
             for key, value in ssd_detail.items():
                 info += '[{0} : {1}]\n'.format(key, value)
             print(info)
             main_log.write(info)
     if diff_ssd:
+        head = '{0} --- SSD Info Change Notice ---\n'.format(identifier)
+        bodybox = []
         for bus_num in diff_ssd:
-            info = '{0} ??? SSD Info Change Notice ???\n'.format(identifier)
             new_ssd_detail = new_ssd_sum[bus_num]
             old_ssd_detail = old_ssd_sum[bus_num]
+            disk_num = new_ssd_detail['disk_num']
+            boot = new_ssd_detail['boot']
+            pci_num = new_ssd_detail['pci_num']
+            sn_num = new_ssd_detail['sn']
+            body = '[{0}][{1}][{2}]-{3}-'.format(pci_num,sn_num,disk_num,boot)
             for item in new_ssd_detail:
                 if new_ssd_detail[item] != old_ssd_detail[item]:
-                    info += '[{0} : {1} ===> {2}]\n'.format(item, old_ssd_detail[item], new_ssd_detail[item])
-            print(info)
-            main_log.write(info)    
+                    # if item is 'temperature':
+                        # if int(new_ssd_detail[item]) < 50 and int(old_ssd_detail[item]) < 50:
+                        #     continue
+                    info = '  [{0} : {1} ===> {2}]\n'.format(item, old_ssd_detail[item], new_ssd_detail[item])
+                    notice = body + info
+                    bodybox.append(notice)
+        if bodybox:
+            print(head)
+            main_log.write(head)
+            for notice in bodybox:
+                print(notice)
+                main_log.write(notice)
+
+
 # ------ Danger Zone ------ #
 main_dict_file = 'main_dict.json'
 monitor_inbox = Inbox(1025) # 建立监控服务器
@@ -243,11 +263,11 @@ error_log = Log('error')    # 定义错误log
 monitor_inbox.on()  # 开启监控进程
 main_dict = load_main_dict(main_dict_file)  # 读取主数据库
 
-while True: 
+while True:
     if monitor_inbox.led():
         message = monitor_inbox.vomit()
         process(message)
+    else:
         with open(main_dict_file, 'w') as db:
             json.dump(main_dict, db)
-    else:
         time.sleep(2)
