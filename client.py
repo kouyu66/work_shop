@@ -153,7 +153,7 @@ def get_current_ssd_info():
         ssd_instanse = SSD(char_device)
         ssd_instanse.load()
         single_detail = ssd_instanse.dump()
-        pci_number = single_detail.pop('pci_num')
+        pci_number = single_detail.get('pci_num')
         ssd_info.update({pci_number : single_detail})
     return ssd_info
 
@@ -224,3 +224,4 @@ while True:
     deliver = Client('109.101.80.172', 1025)
     info_tobe_send = pack(identifier, info_type, info_level)
     deliver.send(info_tobe_send)
+    time.sleep(15)
