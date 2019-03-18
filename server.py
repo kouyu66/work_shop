@@ -238,9 +238,9 @@ def sub_ssd_process(new_ssd_sum, identifier):
             body = '[{0}][{1}][{2}]-{3}-'.format(pci_num,sn_num,disk_num,boot)
             for item in new_ssd_detail:
                 if new_ssd_detail[item] != old_ssd_detail[item]:
-                    # if item is 'temperature':
-                        # if int(new_ssd_detail[item]) < 50 and int(old_ssd_detail[item]) < 50:
-                        #     continue
+                    if item is 'temperature':
+                        if int(new_ssd_detail[item]) < 65: 
+                            continue
                     info = '  [{0} : {1} ===> {2}]\n'.format(item, old_ssd_detail[item], new_ssd_detail[item])
                     notice = body + info
                     bodybox.append(notice)
