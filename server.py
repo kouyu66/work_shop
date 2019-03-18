@@ -226,7 +226,7 @@ def sub_ssd_process(new_ssd_sum, identifier):
             print(info)
             main_log.write(info)
     if diff_ssd:
-        head = '{0} --- SSD Info Change Notice ---\n'.format(identifier)
+        head = '{0}'.format(identifier)
         bodybox = []
         for bus_num in diff_ssd:
             new_ssd_detail = new_ssd_sum[bus_num]
@@ -235,7 +235,7 @@ def sub_ssd_process(new_ssd_sum, identifier):
             boot = new_ssd_detail['boot']
             pci_num = new_ssd_detail['pci_num']
             sn_num = new_ssd_detail['sn']
-            body = '[{0}][{1}][{2}]-{3}-'.format(pci_num,sn_num,disk_num,boot)
+            body = '[{0}][{1}][{2}][{3}]-{4}-'.format(identifier,pci_num,sn_num,disk_num,boot)
             for item in new_ssd_detail:
                 if new_ssd_detail[item] != old_ssd_detail[item]:
                     if item == 'temperature':
